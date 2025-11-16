@@ -9,7 +9,7 @@ package models
 import "github.com/google/uuid"
 
 type Usr struct {
-	UID      uuid.UUID
-	Username string  `json:"username"`
-	Prefix   *string `json:"prefix,omitempty"`
+	UID      uuid.UUID `json:"uid"`
+	Username string    `json:"username"`
+	Prefix   *string   `json:"prefix,omitempty"`
 }

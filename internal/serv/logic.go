@@ -18,7 +18,7 @@ func (e *EchoServ) sendSys(conn net.Conn, msg string) error {
 			Type: "sys",
 		},
 		Msg:       msg,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	}
 
 	n, err := fmt.Fprintf(conn, "%s\n\r", sysEvent.Serialise())
@@ -43,7 +43,7 @@ func (e *EchoServ) broadcast(msgEvent events.Msg, author models.Usr) error {
 			Type: "broadcast",
 		},
 		Msg:       msgEvent.Msg,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 		Usr:       author,
 	}
 
@@ -97,6 +97,7 @@ func (e *EchoServ) readEvent(conn net.Conn) (any, error) {
 		return nil, io.EOF
 	}
 
+	e.log.Debugf("reading event: %d (bytes): %s", n, data[:n])
 	event, err := events.Parse(data[:n])
 	if err != nil {
 		e.sendSys(conn, err.Error())

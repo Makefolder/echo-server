@@ -15,6 +15,23 @@ import (
 
 	"github.com/Makefolder/echo-server/internal/events"
 	"github.com/Makefolder/echo-server/internal/models"
+	"github.com/google/uuid"
+)
+
+var (
+	serverChannels = []events.Channel{
+		{
+			UID:  uuid.New(),
+			Name: "general",
+			Type: events.ChanTypeText,
+		},
+		{
+			UID:  uuid.New(),
+			Name: "voice",
+			Type: events.ChanTypeVoice,
+		},
+	}
+	chanLen = len(serverChannels)
 )
 
 func (e *EchoServ) handleConn(conn net.Conn) {
@@ -88,6 +105,8 @@ func (e *EchoServ) sendCmd(conn net.Conn, event events.Cmd, author models.Usr) e
 		return nil
 	case "users":
 		return e.sendUsrList(conn)
+	case "channels":
+		return e.sendChanList(conn)
 	default:
 		return e.customCmd(conn, event, author)
 	}
@@ -116,7 +135,11 @@ func (e *EchoServ) sendUsrList(conn net.Conn) error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	usrList := events.UsrList{}
+	usrList := events.UsrList{
+		BaseEvent: events.BaseEvent{
+			Type: "usr_list",
+		},
+	}
 	usrList.Users = make([]models.Usr, len(e.conns))
 	usrList.Len = len(e.conns)
 
@@ -124,8 +147,36 @@ func (e *EchoServ) sendUsrList(conn net.Conn) error {
 		usrList.Users = append(usrList.Users, cli.Usr)
 	}
 
-	usrList.Timestamp = time.Now()
-	fmt.Fprintf(conn, "%s\n\r", usrList.Serialise())
+	usrList.Timestamp = time.Now().UTC()
+	n, err := fmt.Fprintf(conn, "%s\n\r", usrList.Serialise())
+	if err != nil {
+		return fmt.Errorf("failed to send chan list event: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("zero bytes sent: %w", err)
+	}
+
+	return nil
+}
+
+func (e *EchoServ) sendChanList(conn net.Conn) error {
+	chanList := events.ChanList{
+		BaseEvent: events.BaseEvent{
+			Type: "chan_list",
+		},
+		Channels:  serverChannels,
+		Len:       chanLen,
+		Timestamp: time.Now().UTC(),
+	}
+
+	n, err := fmt.Fprintf(conn, "%s\n\r", chanList.Serialise())
+	if err != nil {
+		return fmt.Errorf("failed to send chan list event: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("zero bytes sent: %w", err)
+	}
+
 	return nil
 }
 
@@ -161,6 +212,7 @@ func (e *EchoServ) handleVc(conn net.Conn, author models.Usr) {
 				n, err := fmt.Fprintf(cli.Conn, "%s\n\r", ev.Serialise())
 				if err != nil {
 					e.log.Error("failed to broadcast voice event: %v", err)
+					break
 				}
 				if n == 0 {
 					break
