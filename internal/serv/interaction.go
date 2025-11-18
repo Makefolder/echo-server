@@ -41,6 +41,7 @@ func (e *EchoServ) handleConn(conn net.Conn) {
 		e.sendSys(conn, fmt.Sprintf("unauthorized: %s", err.Error()))
 		return
 	}
+	e.sendSys(conn, fmt.Sprintf("authorised as %s", usr.Username))
 
 	e.mu.Lock()
 	e.conns[usr.UID] = Client{

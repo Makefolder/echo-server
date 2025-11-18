@@ -1,0 +1,11 @@
+bin/
+db/
+.git/
+.gitignore
+
+Makefile
+
+LICENSE
+README.md
+
+.DS_Store
