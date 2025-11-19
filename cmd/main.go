@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	host string        = "127.0.0.1"
+	host string        = "0.0.0.0"
 	port uint16        = 2001
 	lvl  zapcore.Level = zap.DebugLevel
 )

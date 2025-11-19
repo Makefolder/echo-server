@@ -102,12 +102,12 @@ func (e *EchoServ) sendCmd(conn net.Conn, event events.Cmd, author models.Usr) e
 		if ok {
 			return errors.New("user is already in voice chat")
 		}
-		go e.handleVc(conn, author)
+		go e.HandleVc(conn, author)
 		return nil
 	case "users":
-		return e.sendUsrList(conn)
+		return e.SendUsrList(conn)
 	case "channels":
-		return e.sendChanList(conn)
+		return e.SendChanList(conn)
 	default:
 		return e.customCmd(conn, event, author)
 	}
@@ -132,7 +132,7 @@ func (e *EchoServ) customCmd(conn net.Conn, event events.Cmd, author models.Usr)
 	return nil
 }
 
-func (e *EchoServ) sendUsrList(conn net.Conn) error {
+func (e *EchoServ) SendUsrList(conn net.Conn) error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -160,7 +160,7 @@ func (e *EchoServ) sendUsrList(conn net.Conn) error {
 	return nil
 }
 
-func (e *EchoServ) sendChanList(conn net.Conn) error {
+func (e *EchoServ) SendChanList(conn net.Conn) error {
 	chanList := events.ChanList{
 		BaseEvent: events.BaseEvent{
 			Type: "chan_list",
@@ -181,7 +181,7 @@ func (e *EchoServ) sendChanList(conn net.Conn) error {
 	return nil
 }
 
-func (e *EchoServ) handleVc(conn net.Conn, author models.Usr) {
+func (e *EchoServ) HandleVc(conn net.Conn, author models.Usr) {
 	e.vcmu.Lock()
 	e.vc[author.UID] = Client{
 		Usr:  author,

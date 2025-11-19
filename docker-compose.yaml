@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  echo:
+    build: .
+    container_name: echo-container
+    depends_on:
+      - postgres
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      DB_HOST: postgres
+    ports:
+      - "2001:2001"
+  postgres:
+    image: postgres:latest
+    container_name: echo-pg-container
+    environment:
+      POSTGRES_USER: echo_owner
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: mydb

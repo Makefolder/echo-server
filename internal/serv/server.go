@@ -71,7 +71,7 @@ func New(log *zap.SugaredLogger, host string, port uint16, opts ...Option) *Echo
 }
 
 func (e *EchoServ) Start(ctx context.Context) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", e.host, e.port))
+	listener, err := net.Listen("tcp4", fmt.Sprintf("%s:%d", e.host, e.port))
 	if err != nil {
 		return fmt.Errorf("failed to start echo server instance: %w", err)
 	}
