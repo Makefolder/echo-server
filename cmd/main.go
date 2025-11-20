@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Makefolder/echo-server/internal/httpclient"
 	"github.com/Makefolder/echo-server/internal/models"
 	"github.com/Makefolder/echo-server/internal/serv"
 	"go.uber.org/zap"
@@ -27,29 +28,29 @@ const (
 	lvl  zapcore.Level = zap.DebugLevel
 )
 
-type PingRes struct {
-	Author models.Usr `json:"author"`
-	Msg    string     `json:"msg"`
-	Args   []string   `json:"args"`
-}
-
-func (p PingRes) Serialize() []byte {
-	res, _ := json.Marshal(p)
-	return res
-}
-
-func handlePing(author models.Usr, args ...string) serv.Serialisable {
-	res := PingRes{
-		Author: author,
-		Msg:    "pong",
-		Args:   args,
+func handlePing(ctx *serv.Ctx, args ...string) {
+	var res struct {
+		Author models.Usr `json:"author"`
+		Msg    string     `json:"msg"`
+		Args   []string   `json:"args"`
 	}
 
-	return res
+	res.Author = ctx.Cli.Usr
+	res.Msg = "pong"
+	res.Args = args
+
+	serialised, err := json.Marshal(res)
+	if err != nil {
+		return
+	}
+
+	if err := ctx.Serv.SendSys(ctx.Cli.Conn, string(serialised)); err != nil {
+		ctx.Log.Errorf("failed to send cmd event: %v", err)
+	}
 }
 
 func main() {
-	logger, err := zap.NewDevelopment(zap.IncreaseLevel(lvl))
+	logger, err := zap.NewProduction(zap.IncreaseLevel(lvl))
 	if err != nil {
 		log.Fatalf("can't initialize zap logger: %v", err)
 	}
@@ -60,11 +61,22 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	e := serv.New(slog, host, port,
+	params := serv.SetupParams{
+		Log:    slog,
+		Host:   host,
+		Port:   port,
+		WebCli: httpclient.New(nil, nil, 5*time.Second),
+	}
+
+	serv, err := serv.New(params,
 		serv.WithCmd("ping", handlePing),
 	)
 
-	if err := e.Start(ctx); err != nil {
+	if err != nil {
+		slog.Fatalf("failed to create echo server instance: %v", err)
+	}
+
+	if err := serv.Start(ctx); err != nil {
 		slog.Fatalf("failed to start echo server instance: %v", err)
 	}
 

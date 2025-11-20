@@ -38,10 +38,10 @@ func (e *EchoServ) handleConn(conn net.Conn) {
 	// 1. Auth
 	usr, err := e.authenticate(conn)
 	if err != nil {
-		e.sendSys(conn, fmt.Sprintf("unauthorized: %s", err.Error()))
+		e.SendSys(conn, fmt.Sprintf("unauthorized: %s", err.Error()))
 		return
 	}
-	e.sendSys(conn, fmt.Sprintf("authorised as %s", usr.Username))
+	e.SendSys(conn, fmt.Sprintf("authorised as %s", usr.Username))
 
 	e.mu.Lock()
 	e.conns[usr.UID] = Client{
@@ -72,7 +72,7 @@ func (e *EchoServ) handleConn(conn net.Conn) {
 
 		// 3. Handle any user interactions
 		if err := e.handleEvent(conn, event, usr); err != nil {
-			e.sendSys(conn, err.Error())
+			e.SendSys(conn, err.Error())
 		}
 	}
 }
@@ -81,7 +81,7 @@ func (e *EchoServ) handleEvent(conn net.Conn, event any, usr models.Usr) error {
 	switch ev := event.(type) {
 	case events.Msg:
 		e.log.Debugf("msg event detected: %v", ev)
-		if err := e.broadcast(ev, usr); err != nil {
+		if err := e.Broadcast(ev, usr); err != nil {
 			return fmt.Errorf("failed to broadcast msg event: %w", err)
 		}
 	case events.Cmd:
@@ -116,19 +116,15 @@ func (e *EchoServ) sendCmd(conn net.Conn, event events.Cmd, author models.Usr) e
 func (e *EchoServ) customCmd(conn net.Conn, event events.Cmd, author models.Usr) error {
 	handler, ok := e.cmds[event.Cmd]
 	if !ok {
-		return fmt.Errorf("command not found: %s", event.Cmd)
+		return ErrCmdNotFound
 	}
 
-	res := handler(author, event.Args...)
-	if res == nil {
-		return errors.New("no response provided")
-	}
+	servCtx := e.newCtx(Client{
+		Usr:  author,
+		Conn: conn,
+	})
 
-	if err := e.sendSys(conn, string(res.Serialize())); err != nil {
-		e.log.Errorf("failed to send cmd event: %v", err)
-		return fmt.Errorf("failed to send cmd event: %w", err)
-	}
-
+	handler(servCtx, event.Args...)
 	return nil
 }
 

@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (e *EchoServ) sendSys(conn net.Conn, msg string) error {
+func (e *EchoServ) SendSys(conn net.Conn, msg string) error {
 	sysEvent := events.Sys{
 		BaseEvent: events.BaseEvent{
 			Type: "sys",
@@ -40,7 +40,7 @@ func (e *EchoServ) sendSys(conn net.Conn, msg string) error {
 	return nil
 }
 
-func (e *EchoServ) broadcast(msgEvent events.Msg, author models.Usr) error {
+func (e *EchoServ) Broadcast(msgEvent events.Msg, author models.Usr) error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -106,9 +106,18 @@ func (e *EchoServ) readEvent(conn net.Conn) (any, error) {
 	e.log.Debugf("reading event: %d (bytes): %s", n, data[:n])
 	event, err := events.Parse(data[:n])
 	if err != nil {
-		e.sendSys(conn, err.Error())
+		e.SendSys(conn, err.Error())
 		return nil, err
 	}
 
 	return event, nil
+}
+
+func (e *EchoServ) newCtx(cli Client) *Ctx {
+	return &Ctx{
+		Serv: e,
+		Web:  e.webCli,
+		Cli:  cli,
+		Log:  e.log,
+	}
 }

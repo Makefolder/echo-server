@@ -8,10 +8,12 @@ package serv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
 
+	"github.com/Makefolder/echo-server/internal/httpclient"
 	"github.com/Makefolder/echo-server/internal/models"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -19,13 +21,31 @@ import (
 
 const bufSize int = 1024 * 1024 * 4 // 4MB
 
-type Serialisable interface {
-	Serialize() []byte
-}
+var (
+	ErrNilLogger   = errors.New("nil logger")
+	ErrNilWebCli   = errors.New("nil web client")
+	ErrInvalidHost = errors.New("invalid host")
+	ErrInvalidPort = errors.New("invalid port")
+	ErrCmdNotFound = errors.New("command not found")
+)
 
 type (
-	CmdHandler func(author models.Usr, args ...string) Serialisable
+	Ctx struct {
+		Log  *zap.SugaredLogger
+		Serv *EchoServ
+		Web  *httpclient.HttpClient
+		Cli  Client
+	}
+
+	CmdHandler func(ctx *Ctx, args ...string)
 	Option     func(*EchoServ)
+
+	SetupParams struct {
+		Log    *zap.SugaredLogger
+		Host   string
+		Port   uint16
+		WebCli *httpclient.HttpClient
+	}
 
 	Client struct {
 		Usr  models.Usr
@@ -33,15 +53,19 @@ type (
 	}
 
 	EchoServ struct {
-		log  *zap.SugaredLogger
+		log *zap.SugaredLogger
+
 		host string
 		port uint16
 
-		cmds map[string]CmdHandler
+		cmds   map[string]CmdHandler
+		webCli *httpclient.HttpClient
 
+		// regular chat (only one room for now)
 		mu    sync.RWMutex
 		conns map[uuid.UUID]Client
 
+		// voice chat (only one room for now)
 		vcmu sync.RWMutex
 		vc   map[uuid.UUID]Client
 	}
@@ -53,21 +77,39 @@ func WithCmd(cmd string, handler CmdHandler) Option {
 	}
 }
 
-func New(log *zap.SugaredLogger, host string, port uint16, opts ...Option) *EchoServ {
-	serv := &EchoServ{
-		log:  log,
-		host: host,
-		port: port,
+func New(params SetupParams, opts ...Option) (*EchoServ, error) {
+	if params.Log == nil {
+		return nil, ErrNilLogger
+	}
 
-		conns: make(map[uuid.UUID]Client),
+	if params.WebCli == nil {
+		return nil, ErrNilWebCli
+	}
+
+	if params.Host == "" {
+		return nil, ErrInvalidHost
+	}
+
+	if params.Port == 0 {
+		return nil, ErrInvalidPort
+	}
+
+	serv := &EchoServ{
+		log:    params.Log,
+		host:   params.Host,
+		port:   params.Port,
+		webCli: params.WebCli,
+
 		cmds:  make(map[string]CmdHandler, len(opts)),
+		conns: make(map[uuid.UUID]Client),
+		vc:    make(map[uuid.UUID]Client),
 	}
 
 	for _, opt := range opts {
 		opt(serv)
 	}
 
-	return serv
+	return serv, nil
 }
 
 func (e *EchoServ) Start(ctx context.Context) error {
